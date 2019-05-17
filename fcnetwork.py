@@ -1,13 +1,24 @@
 # Class FCNetwork
 # Fully Connected Artificial Neural Network
-
+import datetime
+import random
 import numpy as np
 import os
 
+class CrossEntropyCost(object):
+	
+	@staticmethod
+	def fn(a, y):
+		return np.sum(np.nan_to_num(-y*np.log(a)-(1-y)*np.log(1-a)))
+
+	@staticmethod
+	def delta(z, a, y):
+		return (a-y)
+		
 class FCNetwork(object):
 	
 	# Initializes the fully connected neural network
-	def __init__(self):
+	def __init__(self, sizes, cost=CrossEntropyCost):
 		print("initializing fully connected neural network")
 		self.num_layers = len(sizes)
 		self.sizes = sizes
@@ -18,24 +29,31 @@ class FCNetwork(object):
 		self.biases = [np.random.randn(y, 1) for y in self.sizes[1:]]
 		self.weights = [np.random.randn(y, x)/np.sqrt(x) for x, y in zip(self.sizes[:-1], self.sizes[1:])]
 		
+		# set monitoring 
+		self.monitorTrainingCost = True
+		self.monitorTrainingAccuracy = False
+		self.monitorEvaluationCost = True
+		self.monitorEvaluationAccuracy = False
 		
 	def Train(self, trainingData, validationData, learnRate, lmbda, batchSize, epochs=10):
-		self.StochasticGradientDescent(agtrainingData,
-								epochs,
-								miniBatchSize,
-								learnRate,
-								lmbda,
-								evaluationData=validationData,
-								monitorEvaluationAccuracy=True,
-								monitorEvaluationCost=False,
-								monitorTrainingAccuracy=False,
-								monitorTrainingCost=True)
-		
-		print ("\nDo you wish to save this network state? (y/n)")
-		saveyn = sys.stdin.readline().rstrip("\n")
-		if saveyn == "y":
-			now = datetime.datetime.now()
-			self.Save("saved/ann_"+now.strftime("%Y-%m-%d%H-%M"))
+		while(True):
+			self.StochasticGradientDescent(trainingData, epochs, batchSize, learnRate, lmbda, evaluationData=validationData)
+			self.SampleEvaluation(validationData)
+			print("\nTraining completed. What do you wish to do?")
+			print("1) Save network state")
+			print("2) Continue training")
+			print("3) Terminate")
+			choice = int(input("> "))
+			if(choice == 1):
+				now = datetime.datetime.now()
+				self.Save(os.path.join(self.dataPath, "ann_"+now.strftime("%Y-%m-%d%H-%M")))
+			if(choice == 2):
+				learnRate = float(input("Learn Rate: "))
+				lmbda = float(input("Regularization Rate: "))
+				epochs = int(input("Epochs: "))
+				continue
+			if(choice == 3):
+				break
 		
 	# Returns the output of the network for a given input a
 	def FeedForward(self, a):
@@ -43,46 +61,35 @@ class FCNetwork(object):
 			 a = Sigmoid(np.dot(w, a)+b)
 		return a
 		
-	# This is the function that performs the actual training of the networkb
-	def StochasticGradientDescent(self, trainingData, epochs, miniBatchSize, learningRate, lmbda = 0.0, evaluationData=None, monitorEvaluationCost=False, monitorEvaluationAccuracy=False, monitorTrainingCost=False, monitorTrainingAccuracy=False):								  
+	# This is the function that performs the actual training of the network
+	def StochasticGradientDescent(self, trainingData, epochs, miniBatchSize, learningRate, lmbda = 0.0, evaluationData=None):								  
 		n_data = len(evaluationData)
 		n = len(trainingData)
-		evaluationCost, evaluationAccuracy = [], []
-		trainingCost, trainingAccuracy = [], []
 		
-		for j in xrange(epochs):
-		
-			# this is the actual training part
+		for j in range(epochs):
 			random.shuffle(trainingData)
-			miniBatches = [trainingData[k:k+miniBatchSize] for k in xrange(0, n, miniBatchSize)]
+			miniBatches = [trainingData[k:k+miniBatchSize] for k in range(0, n, miniBatchSize)]
 			for miniBatch in miniBatches:
 				self.UpdateMiniBatch(miniBatch, learningRate, lmbda, len(trainingData))
 			print ("Epoch {} training complete (lr:{})".format(j, learningRate))
 
 			
-			if monitorTrainingCost:
+			if self.monitorTrainingCost:
 				cost = self.TotalCost(trainingData, lmbda)
-				trainingCost.append(cost)
 				print("Cost on training data: {}".format(cost))
-				self.UpdateRemoteAPI(str(cost), "update_learning")
 
-			if monitorTrainingAccuracy:
+			if self.monitorTrainingAccuracy:
 				accuracy = self.Accuracy(trainingData, convert=True)
-				trainingAccuracy.append(accuracy)
 				print("Accuracy on training data: {} / {}".format(accuracy, n))
 
-			if monitorEvaluationCost:
-				cost = self.TotalCost(evaluationData, lmbda, convert=True)
-				evaluationCost.append(cost)
-				print("Cost on evaluation data: {}".format(cost))
+			if self.monitorEvaluationCost:
+				cost = self.EvaluationCost(evaluationData)
+				print("Cost on evaluation data: " + str(cost))
 
-			if monitorEvaluationAccuracy:
-				accuracy = self.Accuracy(evaluationData)
+			if self.monitorEvaluationAccuracy:
+				accuracy = self.AccuracyCnt(evaluationData)
 				percentage = ((float)(accuracy)/(float)(n_data))*100.0
-				evaluationAccuracy.append(percentage)
 				print("Accuracy on evaluation data: {}% of sample Size {}".format(percentage, n_data))
-
-		return evaluationCost, evaluationAccuracy, trainingCost, trainingAccuracy
 	
 	def UpdateMiniBatch(self, miniBatch, learningRate, lmbda, n):
 		nabla_b = [np.zeros(b.shape) for b in self.biases]
@@ -119,7 +126,7 @@ class FCNetwork(object):
 		nabla_b[-1] = delta
 		nabla_w[-1] = np.dot(delta, activations[-2].transpose())
 
-		for l in xrange(2, self.num_layers):
+		for l in range(2, self.num_layers):
 			z = zs[-l]
 			sp = SigmoidPrime(z)
 			delta = np.dot(self.weights[-l+1].transpose(), delta) * sp
@@ -128,6 +135,7 @@ class FCNetwork(object):
 		return (nabla_b, nabla_w)
 		
 	def Accuracy(self, data, convert=False):
+		return 0.0
 		if convert:
 			results = [(np.argmax(self.FeedForward(x)), np.argmax(y)) for (x, y) in data]
 			total = sum(int(x == y) for (x, y) in results)
@@ -139,6 +147,14 @@ class FCNetwork(object):
 		self.Confusion(results)		
 		return total
 		
+	def EvaluationCost(self, data):
+		total = 0.0
+		for x, y in data:
+			prediction = self.FeedForward(x)
+			expectation = y
+			total = total + (prediction[0] - expectation[0]) + (prediction[1] - expectation[1])
+		return total / float(len(data))
+		
 	def TotalCost(self, data, lmbda, convert=False):
 		cost = 0.0
 		for x, y in data:
@@ -149,6 +165,13 @@ class FCNetwork(object):
 		cost += 0.5*(lmbda/len(data))*sum(np.linalg.norm(w)**2 for w in self.weights)
 		return cost
 
+	def SampleEvaluation(self, data):
+		print("\nSample Evaluation")
+		for x, y in data[:min(10, len(data))]:
+			prediction = self.FeedForward(x)
+			expectation = y
+			print(str(expectation[0]) + ", " + str(expectation[1]) + " -> " + str(prediction[0]) + ", " + str(prediction[1]))
+		
 	def Save(self, filename):
 		data = {"sizes": self.sizes,
 				"weights": [w.tolist() for w in self.weights],
@@ -162,12 +185,12 @@ class FCNetwork(object):
 	def Load(self, path=""):
 		# Choose a file to load
 		if(path == ""):
-			mtime = lambda f: os.stat(os.path.join("saved", f)).st_mtime
-			files = list(sorted(os.listdir("saved"), key=mtime))
+			mtime = lambda f: os.stat(os.path.join("data", f)).st_mtime
+			files = list(sorted(os.listdir("data"), key=mtime))
 			print("\nChoose a file to load:")
 			print('\n'.join('{}: {}'.format(*k) for k in enumerate(files)))
 			fileindex = int(sys.stdin.readline().rstrip("\n"))
-			filename = "saved/" + files[fileindex]
+			filename = "data/" + files[fileindex]
 		else:
 			filename = path
 		
@@ -180,12 +203,14 @@ class FCNetwork(object):
 		self.weights = [np.array(w) for w in data["weights"]]
 		self.biases = [np.array(b) for b in data["biases"]]
 		
-class CrossEntropyCost(object):
+### Miscellaneous Functions
+def VectorizedResults(j):
+	e = np.zeros((10, 1))
+	e[j] = 1.0
+	return e
 	
-	@staticmethod
-	def fn(a, y):
-		return np.sum(np.nan_to_num(-y*np.log(a)-(1-y)*np.log(1-a)))
+def Sigmoid(z):
+	return 1.0/(1.0+np.exp(-z))
 
-	@staticmethod
-	def delta(z, a, y):
-		return (a-y)
+def SigmoidPrime(z):
+	return Sigmoid(z)*(1-Sigmoid(z))

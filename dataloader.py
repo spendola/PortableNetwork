@@ -90,6 +90,47 @@ class DataLoader(object):
 			
 		return dataset
 		
+	def LoadDataset(self, path, evaluation_size=100):
+		data = self.LoadCsvFile(path)
+		samples = np.zeros((len(data), len(data[0]) - 2), dtype=float)
+		labels = np.zeros((len(data), 2), dtype=float)
+
+		for sample in data:
+			row = data.index(sample)
+			labels[row][0] = sample[-2]
+			labels[row][1] = sample[-1]
+			for i in range(len(sample)-2):
+				samples[row][i] = sample[i]
+			
+		print("creating training dataset")
+		print(samples.shape)
+		data = [np.reshape(x, (5, 1)) for x in samples[:-evaluation_size]]
+		label = [np.reshape(x, (2, 1)) for x in labels[:-evaluation_size]]
+		trainingData = list(zip(data, label))
+		
+		print("creating evaluation dataset")
+		data = [np.reshape(x, (5, 1)) for x in samples[-evaluation_size:]]
+		label = [np.reshape(x, (2, 1)) for x in labels[-evaluation_size:]]
+		evaluationData = list(zip(data, label))
+		
+		print("Training Data: " + str(len(trainingData)))
+		print("Evaluation Data: " + str(len(evaluationData)))
+		return trainingData, evaluationData
+		
+	def GenerateTestDataset(self):
+		print("Generating Sample Dataset")
+		with open(os.path.join(self.dataPath, "sample_dataset.csv"), "w+") as output:
+			for i in range(1000):
+				a = round(random.uniform(0.0, 100.0), 2)
+				b = round(random.uniform(0.0, 100.0), 2)
+				c = round(random.uniform(0.0, 100.0), 2)
+				d = round(random.uniform(0.0, 100.0), 2)
+				e = round(random.uniform(0.0, 100.0), 2)
+				f = round(((a) + (b*2) + (c*3) + (d*4) + (e*5)) / 1500.0, 3)
+				g = round(1.0 - f, 3)
+				output.write(str(a) + ", " + str(b) + ", " + str(c) + ", " + str(d) + ", " + str(e) + ", " + str(f) + ", " + str(g) + "\n")
+		print("done")
+		
 	def UrlRequest(self, type, week, year, resource, verbose=False):
 		post_data = urllib.parse.urlencode({'type':type, 'week':str(week), 'year':str(year), 'args':resource}).encode('utf-8')		
 		x = urllib.request.urlopen(url='http://www.pendola.net/api/datalink.php', data=post_data)
