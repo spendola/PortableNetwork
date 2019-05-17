@@ -104,12 +104,12 @@ class DataLoader(object):
 			
 		print("creating training dataset")
 		print(samples.shape)
-		data = [np.reshape(x, (5, 1)) for x in samples[:-evaluation_size]]
+		data = [np.reshape(x, (len(data[0]) - 2, 1)) for x in samples[:-evaluation_size]]
 		label = [np.reshape(x, (2, 1)) for x in labels[:-evaluation_size]]
 		trainingData = list(zip(data, label))
 		
 		print("creating evaluation dataset")
-		data = [np.reshape(x, (5, 1)) for x in samples[-evaluation_size:]]
+		data = [np.reshape(x, (len(data[0]) - 2, 1)) for x in samples[-evaluation_size:]]
 		label = [np.reshape(x, (2, 1)) for x in labels[-evaluation_size:]]
 		evaluationData = list(zip(data, label))
 		

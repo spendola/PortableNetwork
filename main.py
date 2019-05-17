@@ -11,7 +11,7 @@ def main():
 		print("\n1) Build Dataset")
 		print("2) Expand Dataset")
 		print("3) Generate Sample Dataset")
-		print("4) Load Dataset")
+		print("4) Train Neural Network")
 		choice = int(input("Seleccione una Opcion > "))
 		if(choice == 1):
 			dataLoader = dataloader.DataLoader()
